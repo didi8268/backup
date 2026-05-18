@@ -178,6 +178,7 @@ def refresh_monitor_table():
 
     refresh_waveform_plot()
     _refresh_bar_chart()
+    _refresh_hero_metrics()
     _update_bool_indicators()
     alarm_mgr.check(monitor)
     refresh_alarm_history_table()
@@ -707,6 +708,47 @@ def _update_bool_indicators():
         dpg.bind_item_theme(tag, "bool_on_theme" if val else "bool_off_theme")
 
 
+def _refresh_hero_metrics():
+    """刷新 Hero 指标卡片行"""
+    if not dpg.does_item_exist("hero_row"):
+        return
+    points = monitor.get_points()
+    non_bool = [(i, pt) for i, pt in enumerate(points) if pt.data_type != "Bool"]
+
+    # 清除旧卡片
+    dpg.delete_item("hero_row", children_only=True)
+
+    for idx, pt in non_bool:
+        tag = f"hero_card_{idx}"
+        with dpg.child_window(tag=tag, parent="hero_row", width=140, height=72,
+                              border=True):
+            dpg.bind_item_theme(tag, "card_theme")
+            # 数值
+            if pt.current_value is not None:
+                try:
+                    v = float(pt.current_value) * pt.scale
+                    val_str = f"{v:.{pt.decimal_places}f}"
+                except (TypeError, ValueError):
+                    val_str = str(pt.current_value)
+            else:
+                val_str = "—"
+            color = WAVE_PALETTE[idx % len(WAVE_PALETTE)]
+            val_text = dpg.add_text(val_str, color=color)
+            if hero_font:
+                dpg.bind_item_font(val_text, hero_font)
+            # 名称 + 单位
+            label = pt.name
+            if pt.unit:
+                label += f" ({pt.unit})"
+            label_text = dpg.add_text(label, color=TEXT_SECONDARY)
+            if tiny_font:
+                dpg.bind_item_font(label_text, tiny_font)
+        dpg.add_spacer(width=8, parent="hero_row")
+
+    if not non_bool:
+        dpg.add_text("(无监控数据)", color=TEXT_MUTED, parent="hero_row")
+
+
 def _refresh_bar_chart():
     """刷新柱状图：显示各通道当前值和历史最大值"""
     if not dpg.does_item_exist("bar_series"):
@@ -1096,73 +1138,91 @@ def main():
                 # ═════════════ 实时监控 ═════════════
                 with dpg.tab(label="  实时监控  "):
                     dpg.add_spacer(height=4)
-                    # 柱状图卡片
-                    with dpg.child_window(tag="bar_card", height=200, border=True):
-                        with dpg.group(horizontal=True):
-                            dpg.add_text("数值柱状图", color=ACCENT)
-                            dpg.bind_item_theme(dpg.last_item(), "section_header")
-                            dpg.add_spacer(width=12)
-                            dpg.add_text("当前值", color=GREEN)
-                            dpg.add_spacer(width=8)
-                            dpg.add_text("历史最大 ◆", color=RED)
-                        dpg.add_separator()
-                        dpg.add_spacer(height=2)
-                        with dpg.plot(
-                            tag="bar_plot", height=150, width=-1,
-                            anti_aliased=True, no_menus=True,
-                        ):
-                            dpg.add_plot_axis(dpg.mvXAxis, label="", tag="bar_x_axis")
-                            dpg.add_plot_axis(dpg.mvYAxis, label="", tag="bar_y_axis")
-                            dpg.add_bar_series([], [], parent="bar_y_axis", tag="bar_series")
-                            dpg.add_scatter_series([], [], parent="bar_y_axis", tag="bar_max_scatter")
-                            dpg.bind_item_theme("bar_series", "bar_theme")
-                            dpg.bind_item_theme("bar_max_scatter", "bar_max_theme")
-                            if small_font:
-                                dpg.bind_item_font("bar_x_axis", small_font)
-                                dpg.bind_item_font("bar_y_axis", small_font)
-                    dpg.bind_item_theme("bar_card", "card_theme")
 
-                    dpg.add_spacer(height=4)
-                    # 波形图卡片
-                    with dpg.child_window(tag="wave_card", height=480, border=True):
-                        with dpg.group(horizontal=True):
-                            dpg.add_text("实时波形", color=ACCENT)
-                            dpg.bind_item_theme(dpg.last_item(), "section_header")
-                            dpg.add_spacer(width=16)
-                            dpg.add_text("窗口:", color=TEXT_SECONDARY)
-                            dpg.add_input_int(tag="wave_time_window", default_value=60,
-                                              width=70, min_value=5, max_value=3600, step=5)
-                            dpg.add_text("秒", color=TEXT_MUTED)
-                        dpg.add_separator()
-                        dpg.add_spacer(height=2)
-                        dpg.add_group(tag="wave_channel_container", horizontal=True)
-                        dpg.add_spacer(height=2)
-                        with dpg.plot(
-                            tag="wave_plot", label="实时波形", height=370, width=-1,
-                            anti_aliased=True, no_menus=True,
-                        ):
-                            dpg.add_plot_legend()
-                            dpg.add_plot_axis(dpg.mvXAxis, label="时间 (秒)", tag="wave_x_axis")
-                            dpg.add_plot_axis(dpg.mvYAxis, label="Y左", tag="wave_y_axis_0")
-                            dpg.add_plot_axis(dpg.mvYAxis2, label="Y右", tag="wave_y_axis_1", opposite=True)
-                            dpg.add_plot_axis(dpg.mvYAxis3, label="Y左2", tag="wave_y_axis_2")
-                            dpg.set_axis_limits("wave_x_axis", 0, 60)
-                            dpg.set_axis_limits_auto("wave_y_axis_0")
-                            dpg.set_axis_limits_auto("wave_y_axis_1")
-                            dpg.set_axis_limits_auto("wave_y_axis_2")
-                            dpg.hide_item("wave_y_axis_2")
-                            if small_font:
-                                for ax in ("wave_x_axis", "wave_y_axis_0", "wave_y_axis_1", "wave_y_axis_2"):
-                                    dpg.bind_item_font(ax, small_font)
-                    dpg.bind_item_theme("wave_card", "card_theme")
+                    # Hero 指标行
+                    dpg.add_group(tag="hero_row", horizontal=True)
+                    dpg.add_spacer(height=6)
 
-                    dpg.add_spacer(height=4)
-                    # 数据表格卡片
+                    # 图表行：柱状图 + 波形图并排
+                    with dpg.group(horizontal=True):
+                        # 柱状图卡片 (左侧 ~35%)
+                        with dpg.child_window(tag="bar_card", width=380, height=300, border=True):
+                            with dpg.group(horizontal=True):
+                                dpg.add_text("数值柱状图", color=ACCENT)
+                                dpg.bind_item_theme(dpg.last_item(), "section_header")
+                                if title_font:
+                                    dpg.bind_item_font(dpg.last_item(), title_font)
+                                dpg.add_spacer(width=12)
+                                dpg.add_text("当前值", color=GREEN)
+                                dpg.add_spacer(width=8)
+                                dpg.add_text("◆ 历史最大", color=RED)
+                            dpg.add_separator()
+                            dpg.bind_item_theme(dpg.last_item(), "separator_accent")
+                            dpg.add_spacer(height=4)
+                            with dpg.plot(
+                                tag="bar_plot", height=235, width=-1,
+                                anti_aliased=True, no_menus=True,
+                            ):
+                                dpg.add_plot_axis(dpg.mvXAxis, label="", tag="bar_x_axis")
+                                dpg.add_plot_axis(dpg.mvYAxis, label="", tag="bar_y_axis")
+                                dpg.add_bar_series([], [], parent="bar_y_axis", tag="bar_series")
+                                dpg.add_scatter_series([], [], parent="bar_y_axis", tag="bar_max_scatter")
+                                dpg.bind_item_theme("bar_series", "bar_theme")
+                                dpg.bind_item_theme("bar_max_scatter", "bar_max_theme")
+                                if small_font:
+                                    dpg.bind_item_font("bar_x_axis", small_font)
+                                    dpg.bind_item_font("bar_y_axis", small_font)
+                        dpg.bind_item_theme("bar_card", "card_theme")
+
+                        dpg.add_spacer(width=8)
+
+                        # 波形图卡片 (右侧 ~65%)
+                        with dpg.child_window(tag="wave_card", height=300, border=True):
+                            with dpg.group(horizontal=True):
+                                dpg.add_text("实时波形", color=ACCENT)
+                                dpg.bind_item_theme(dpg.last_item(), "section_header")
+                                if title_font:
+                                    dpg.bind_item_font(dpg.last_item(), title_font)
+                                dpg.add_spacer(width=16)
+                                dpg.add_text("窗口:", color=TEXT_SECONDARY)
+                                dpg.add_input_int(tag="wave_time_window", default_value=60,
+                                                  width=70, min_value=5, max_value=3600, step=5)
+                                dpg.add_text("秒", color=TEXT_MUTED)
+                            dpg.add_separator()
+                            dpg.bind_item_theme(dpg.last_item(), "separator_accent")
+                            dpg.add_spacer(height=4)
+                            dpg.add_group(tag="wave_channel_container", horizontal=True)
+                            dpg.add_spacer(height=2)
+                            with dpg.plot(
+                                tag="wave_plot", label="实时波形", height=200, width=-1,
+                                anti_aliased=True, no_menus=True,
+                            ):
+                                dpg.add_plot_legend()
+                                dpg.add_plot_axis(dpg.mvXAxis, label="时间 (秒)", tag="wave_x_axis")
+                                dpg.add_plot_axis(dpg.mvYAxis, label="Y左", tag="wave_y_axis_0")
+                                dpg.add_plot_axis(dpg.mvYAxis2, label="Y右", tag="wave_y_axis_1", opposite=True)
+                                dpg.add_plot_axis(dpg.mvYAxis3, label="Y左2", tag="wave_y_axis_2")
+                                dpg.set_axis_limits("wave_x_axis", 0, 60)
+                                dpg.set_axis_limits_auto("wave_y_axis_0")
+                                dpg.set_axis_limits_auto("wave_y_axis_1")
+                                dpg.set_axis_limits_auto("wave_y_axis_2")
+                                dpg.hide_item("wave_y_axis_2")
+                                if small_font:
+                                    for ax in ("wave_x_axis", "wave_y_axis_0", "wave_y_axis_1", "wave_y_axis_2"):
+                                        dpg.bind_item_font(ax, small_font)
+                        dpg.bind_item_theme("wave_card", "card_theme")
+
+                    dpg.add_spacer(height=6)
+
+                    # 数据表格卡片 (全宽)
                     with dpg.child_window(tag="data_card", height=340, border=True):
                         dpg.add_text("监控数据", color=ACCENT)
                         dpg.bind_item_theme(dpg.last_item(), "section_header")
+                        if title_font:
+                            dpg.bind_item_font(dpg.last_item(), title_font)
                         dpg.add_separator()
-                        dpg.add_spacer(height=2)
+                        dpg.bind_item_theme(dpg.last_item(), "separator_accent")
+                        dpg.add_spacer(height=4)
                         with dpg.table(
                             tag="monitor_table", header_row=True, borders_innerH=True,
                             borders_outerH=True, borders_innerV=True, borders_outerV=True,
@@ -1172,7 +1232,7 @@ def main():
                             dpg.add_table_column(label="地址", width_fixed=True, init_width_or_weight=80)
                             dpg.add_table_column(label="名称", width_fixed=True, init_width_or_weight=80)
                             dpg.add_table_column(label="类型", width_fixed=True, init_width_or_weight=60)
-                            dpg.add_table_column(label="当前值", width_fixed=True, init_width_or_weight=80)
+                            dpg.add_table_column(label="当前值", width_fixed=True, init_width_or_weight=90)
                             dpg.add_table_column(label="写入值")
                             dpg.add_table_column(label="操作", width_fixed=True, init_width_or_weight=80)
                     dpg.bind_item_theme("data_card", "card_theme")
