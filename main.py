@@ -37,6 +37,10 @@ wave_visible: dict[int, tuple] = {}
 wave_series_created: set = set()  # 已创建的 series 对应的 point_index
 bar_history_max: dict[int, float] = {}  # 柱状图历史最大值 {point_index: max_val}
 
+hero_font = None
+title_font = None
+tiny_font = None
+
 # 预置示例监控点（方便测试）
 _monitor_test_points = [
     ("VW100", "温度传感器", "Word", "°C", 0.1, 1),
@@ -48,14 +52,16 @@ for addr, name, dt, unit, scale, dec in _monitor_test_points:
     monitor.add_point(addr, name, data_type=dt, unit=unit, scale=scale, decimal_places=dec)
 
 # ── 配色（Z-Monitor 风格青色科技主题）──────────────────
-BG_DARK = (15, 23, 42)       # slate-900 主背景
-BG_SIDEBAR = (10, 17, 32)    # 更深侧边栏
-BG_CARD = (20, 30, 52)       # 卡片面板背景
-BG_CARD_ALT = (25, 35, 58)   # 卡片交替色
-BG_INPUT = (18, 26, 48)      # 输入框背景
+BG_DARK = (14, 17, 23)       # neutral-950 主背景
+BG_SIDEBAR = (18, 24, 32)    # 顶栏/侧栏背景
+BG_CARD = (24, 30, 38)       # 卡片面板背景
+BG_CARD_ALT = (31, 38, 48)   # 卡片交替色
+BG_INPUT = (20, 25, 33)      # 输入框背景
+BG_INPUT_ACTIVE = (27, 36, 48)  # 输入/控件激活背景
 ACCENT = (6, 182, 212)       # cyan-500 主强调色
 ACCENT_HOVER = (34, 211, 238)  # cyan-400 悬停
 ACCENT_DIM = (8, 145, 178)   # cyan-600 暗强调
+ACCENT_SOFT = (10, 79, 96)    # 控件弱强调背景
 GREEN = (16, 185, 129)       # emerald-500 成功
 GREEN_GLOW = (52, 211, 153)  # green-400
 RED = (239, 68, 68)          # red-500 错误
@@ -65,9 +71,12 @@ YELLOW_GLOW = (252, 211, 77)  # amber-300
 TEXT_PRIMARY = (226, 232, 240)   # slate-200
 TEXT_SECONDARY = (148, 163, 184)  # slate-400
 TEXT_MUTED = (100, 116, 139)     # slate-500
-BORDER = (30, 40, 64)           # 边框
+BORDER = (51, 65, 85)           # 边框
+SUBTLE_BORDER = (38, 50, 64)    # 弱边框
 BORDER_ACCENT = (6, 182, 212, 60)  # 青色半透明边框
-SEPARATOR_COLOR = (6, 182, 212, 80)  # 青色分隔线
+SEPARATOR_COLOR = (71, 85, 105, 120)  # 分隔线
+PLOT_GRID = (71, 85, 105, 70)    # 图表网格线
+PLOT_BG = (17, 22, 30)           # 图表背景
 
 # 波形颜色轮转 (支持无限通道)
 WAVE_PALETTE = [
@@ -145,8 +154,9 @@ def refresh_monitor_table():
             with dpg.group(horizontal=True):
                 dpg.add_button(
                     label="删除", tag=f"del_btn_{i}",
-                    callback=on_delete_point, user_data=i, width=40
+                    callback=on_delete_point, user_data=i, width=58
                 )
+                dpg.bind_item_theme(f"del_btn_{i}", "btn_danger_theme")
 
         if i % 2 == 1:
             dpg.highlight_table_row(table_tag, i, BG_CARD)
@@ -412,10 +422,13 @@ def on_import_points():
 def on_delete_point(sender, app_data, user_data):
     idx = user_data
     if monitor.remove_point(idx):
+        for old_idx in list(wave_series_created):
+            tag = f"wave_series_{old_idx}"
+            if dpg.does_item_exist(tag):
+                dpg.delete_item(tag)
         wave_buffers.pop(idx, None)
         wave_visible.pop(idx, None)
         bar_history_max.pop(idx, None)
-        wave_series_created.discard(idx)
         # 重映射 buffer / visible key（大于删除索引的 key 减 1）
         for src in [wave_buffers, wave_visible, bar_history_max]:
             new_src = {}
@@ -426,10 +439,11 @@ def on_delete_point(sender, app_data, user_data):
                     new_src[old_k] = v
             src.clear()
             src.update(new_src)
-        remap = {k - 1 for k in wave_series_created if k > idx}
-        wave_series_created.difference_update({k for k in wave_series_created if k >= idx})
-        wave_series_created.update(remap)
+        wave_series_created.clear()
+        alarm_mgr.remap_after_point_delete(idx)
         _refresh_point_combos()
+        refresh_alarm_table()
+        refresh_alarm_history_table()
         update_status("监控点已删除", YELLOW)
 
 
@@ -454,7 +468,7 @@ def on_write_value(sender, app_data, user_data):
         return
 
     if plc.is_connected():
-        if plc.write_by_address(pt.address, val):
+        if plc.write_by_address(pt.address, val, pt.data_type):
             update_status(f"写入成功: {pt.address} = {val}", GREEN)
         else:
             update_status(f"写入失败: {pt.address}", RED)
@@ -490,6 +504,9 @@ def on_wave_start():
     if not addr:
         update_status("请选择有效的目标地址", RED)
         return
+    point_idx = _combo_value_to_index("waveout_addr")
+    points = monitor.get_points()
+    data_type = points[point_idx].data_type if 0 <= point_idx < len(points) else ""
 
     wtype_str = dpg.get_value("waveout_type")
     amp = dpg.get_value("waveout_amp")
@@ -504,7 +521,7 @@ def on_wave_start():
     }
     wtype = wtype_map.get(wtype_str, WaveformType.SINE)
 
-    if wave_output.configure(addr, wtype, amp, offset, period):
+    if wave_output.configure(addr, wtype, amp, offset, period, data_type):
         if wave_output.start(plc):
             update_status(f"波形输出已开始: {addr}", GREEN)
             dpg.configure_item("wave_start_btn", label="输出中...", enabled=False)
@@ -639,7 +656,7 @@ def _on_bool_indicator_click(idx: int):
         return
     new_val = not pt.current_value if pt.current_value is not None else True
     if plc.is_connected():
-        if plc.write_by_address(pt.address, new_val):
+        if plc.write_by_address(pt.address, new_val, pt.data_type):
             pt.current_value = new_val
             update_status(f"写入成功: {pt.address} = {new_val}", GREEN)
         else:
@@ -661,7 +678,7 @@ def _refresh_bool_indicators():
     bool_points = [(i, pt) for i, pt in enumerate(points) if pt.data_type == "Bool"]
     for i, pt in bool_points:
         val = pt.current_value
-        label = f"{pt.name}: ON" if val else f"{pt.name}: OFF"
+        label = f"● {pt.name} ON" if val else f"○ {pt.name} OFF"
         dpg.add_button(
             tag=f"bool_ind_{i}", label=label, width=95,
             callback=lambda s, a, u: _on_bool_indicator_click(u),
@@ -680,7 +697,7 @@ def _update_bool_indicators():
         if not dpg.does_item_exist(tag):
             continue
         val = pt.current_value
-        dpg.configure_item(tag, label=f"{pt.name}: ON" if val else f"{pt.name}: OFF")
+        dpg.configure_item(tag, label=f"● {pt.name} ON" if val else f"○ {pt.name} OFF")
         dpg.bind_item_theme(tag, "bool_on_theme" if val else "bool_off_theme")
 
 
@@ -712,7 +729,7 @@ def _refresh_bar_chart():
     if xs:
         dpg.set_value("bar_series", [xs, vals])
         dpg.set_value("bar_max_scatter", [xs, max_vals])
-        dpg.set_axis_ticks("bar_x_axis", tuple(zip(xs, names)))
+        dpg.set_axis_ticks("bar_x_axis", tuple(zip(names, xs)))
         max_v = max(max_vals) if max_vals else 0
         dpg.set_axis_limits("bar_y_axis", 0, max(max_v * 1.15, 10))
     else:
@@ -747,7 +764,7 @@ def _refresh_points_table():
         dpg.add_table_column(label="比例", width_fixed=True, init_width_or_weight=55)
         dpg.add_table_column(label="小数", width_fixed=True, init_width_or_weight=40)
         dpg.add_table_column(label="Y轴", width_fixed=True, init_width_or_weight=50)
-        dpg.add_table_column(label="删除", width_fixed=True, init_width_or_weight=45)
+        dpg.add_table_column(label="删除", width_fixed=True, init_width_or_weight=64)
 
         for i, pt in enumerate(points):
             with dpg.table_row():
@@ -769,9 +786,11 @@ def _refresh_points_table():
                 )
                 dpg.add_button(
                     label="删除",
+                    tag=f"point_del_btn_{i}",
                     callback=on_delete_point,
-                    user_data=i, width=40
+                    user_data=i, width=58
                 )
+                dpg.bind_item_theme(f"point_del_btn_{i}", "btn_danger_theme")
             if i % 2 == 1:
                 dpg.highlight_table_row("points_mgmt_table", i, BG_CARD)
 
@@ -814,15 +833,30 @@ def _on_wave_axis_change(idx: int, val: str):
 def main():
     dpg.create_context()
 
-    # 加载中文字体
+    # 加载中文字体 (多级字号)
+    global hero_font, title_font, tiny_font
+    hero_font = None
+    title_font = None
+    body_font = None
     small_font = None
-    for f in ["C:/Windows/Fonts/simhei.ttf", "C:/Windows/Fonts/msyh.ttc"]:
+    tiny_font = None
+    for f in ["C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/simhei.ttf"]:
         if os.path.isfile(f):
             with dpg.font_registry():
-                default_font = dpg.add_font(f, 16)
-                small_font = dpg.add_font(f, 12)
-            dpg.bind_font(default_font)
+                hero_font = dpg.add_font(f, 28)     # Hero 数字
+                title_font = dpg.add_font(f, 18)     # 卡片标题
+                body_font = dpg.add_font(f, 16)      # 默认正文
+                small_font = dpg.add_font(f, 13)     # 辅助文字/坐标轴
+                tiny_font = dpg.add_font(f, 11)      # 微型标注
+            dpg.bind_font(body_font)  # 全局默认 16px
             break
+
+    # 如果找不到中文字体，回退默认字体（无多级字号）
+    if body_font is None:
+        with dpg.font_registry():
+            body_font = dpg.add_font("", 16)
+            small_font = dpg.add_font("", 12)
+        dpg.bind_font(body_font)
 
     # 加载 logo 纹理
     logo_path = os.path.join(os.path.dirname(__file__), "智维通logo_彩色.png")
@@ -848,21 +882,25 @@ def main():
             dpg.add_theme_color(dpg.mvThemeCol_WindowBg, BG_DARK)
             dpg.add_theme_color(dpg.mvThemeCol_ChildBg, BG_DARK)
             dpg.add_theme_color(dpg.mvThemeCol_FrameBg, BG_INPUT)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, BG_INPUT_ACTIVE)
             dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_PRIMARY)
             dpg.add_theme_color(dpg.mvThemeCol_TextDisabled, TEXT_SECONDARY)
-            dpg.add_theme_color(dpg.mvThemeCol_Button, ACCENT_DIM)
+            dpg.add_theme_color(dpg.mvThemeCol_Button, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, ACCENT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_HOVER)
             dpg.add_theme_color(dpg.mvThemeCol_Header, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, BG_CARD)
-            dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, BG_CARD)
-            dpg.add_theme_color(dpg.mvThemeCol_Separator, BORDER)
+            dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, ACCENT_SOFT)
+            dpg.add_theme_color(dpg.mvThemeCol_Separator, SEPARATOR_COLOR)
             dpg.add_theme_color(dpg.mvThemeCol_TableBorderStrong, BORDER)
-            dpg.add_theme_color(dpg.mvThemeCol_TableBorderLight, BORDER)
-            dpg.add_theme_color(dpg.mvThemeCol_TableHeaderBg, BG_CARD)
+            dpg.add_theme_color(dpg.mvThemeCol_TableBorderLight, SUBTLE_BORDER)
+            dpg.add_theme_color(dpg.mvThemeCol_TableHeaderBg, BG_INPUT)
+            dpg.add_theme_color(dpg.mvThemeCol_TableRowBg, (0, 0, 0, 0))
+            dpg.add_theme_color(dpg.mvThemeCol_TableRowBgAlt, BG_CARD_ALT)
             dpg.add_theme_color(dpg.mvThemeCol_ScrollbarBg, BG_DARK)
-            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrab, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrabHovered, BG_CARD)
+            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrab, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrabHovered, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrabActive, ACCENT_DIM)
             dpg.add_theme_color(dpg.mvThemeCol_TitleBg, BG_SIDEBAR)
             dpg.add_theme_color(dpg.mvThemeCol_TitleBgActive, BG_CARD)
@@ -870,11 +908,21 @@ def main():
             dpg.add_theme_color(dpg.mvThemeCol_CheckMark, ACCENT)
             dpg.add_theme_color(dpg.mvThemeCol_PlotHistogram, ACCENT)
             dpg.add_theme_color(dpg.mvThemeCol_Tab, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_TabHovered, BG_CARD)
+            dpg.add_theme_color(dpg.mvThemeCol_TabHovered, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_TabActive, ACCENT_DIM)
+            dpg.add_theme_color(dpg.mvThemeCol_TabUnfocused, BG_INPUT)
+            dpg.add_theme_color(dpg.mvThemeCol_TabUnfocusedActive, BG_CARD_ALT)
             dpg.add_theme_color(dpg.mvThemeCol_DockingPreview, ACCENT_DIM)
             dpg.add_theme_color(dpg.mvThemeCol_Border, BORDER)
             dpg.add_theme_color(dpg.mvThemeCol_PlotLines, ACCENT)
+            dpg.add_theme_color(dpg.mvPlotCol_PlotBg, PLOT_BG)
+            dpg.add_theme_color(dpg.mvPlotCol_FrameBg, BG_CARD)
+            dpg.add_theme_color(dpg.mvPlotCol_AxisGrid, PLOT_GRID)
+            dpg.add_theme_color(dpg.mvPlotCol_AxisText, TEXT_SECONDARY)
+            dpg.add_theme_color(dpg.mvPlotCol_AxisTick, TEXT_MUTED)
+            dpg.add_theme_color(dpg.mvPlotCol_LegendBg, BG_CARD)
+            dpg.add_theme_color(dpg.mvPlotCol_LegendBorder, BORDER)
+            dpg.add_theme_color(dpg.mvPlotCol_PlotBorder, SUBTLE_BORDER)
             dpg.add_theme_color(dpg.mvThemeCol_NavHighlight, ACCENT_DIM)
             dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 4)
             dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1)
@@ -885,14 +933,18 @@ def main():
             dpg.add_theme_style(dpg.mvStyleVar_TabRounding, 4)
             dpg.add_theme_style(dpg.mvStyleVar_WindowRounding, 8)
             dpg.add_theme_style(dpg.mvStyleVar_SelectableTextAlign, 0.5, 0.5)
+            dpg.add_theme_style(dpg.mvStyleVar_CellPadding, 8, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 10, 8)
+            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_ItemInnerSpacing, 6, 5)
     dpg.bind_theme(theme_id)
 
     # ── 卡片容器主题 ──
     with dpg.theme(tag="card_theme"):
         with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_ChildBg, BG_CARD)
-            dpg.add_theme_color(dpg.mvThemeCol_Border, BORDER)
-            dpg.add_theme_style(dpg.mvStyleVar_ChildRounding, 8)
+            dpg.add_theme_color(dpg.mvThemeCol_Border, SUBTLE_BORDER)
+            dpg.add_theme_style(dpg.mvStyleVar_ChildRounding, 6)
             dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1)
 
     # ── 按钮风格 ──
@@ -902,15 +954,17 @@ def main():
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, ACCENT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_HOVER)
             dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 255, 255))
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 11, 6)
 
     with dpg.theme(tag="btn_ghost_theme"):
         with dpg.theme_component(dpg.mvButton):
             dpg.add_theme_color(dpg.mvThemeCol_Button, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, BG_CARD)
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_Text, ACCENT)
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_SOFT)
+            dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_PRIMARY)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 11, 6)
 
     # ── 柱状图主题 ──
     with dpg.theme(tag="bar_theme"):
@@ -933,34 +987,42 @@ def main():
 
     with dpg.theme(tag="btn_danger_theme"):
         with dpg.theme_component(dpg.mvButton):
-            dpg.add_theme_color(dpg.mvThemeCol_Button, RED)
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, RED_GLOW)
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (127, 29, 29))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (185, 28, 28))
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, RED)
             dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 255, 255))
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 11, 6)
 
     # ── Bool 指示器主题 ──
     with dpg.theme(tag="bool_on_theme"):
         with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_color(dpg.mvThemeCol_Button, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (20, 100, 70))
-            dpg.add_theme_color(dpg.mvThemeCol_Text, GREEN_GLOW)
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 4)
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (5, 95, 72))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (5, 150, 105))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, GREEN)
+            dpg.add_theme_color(dpg.mvThemeCol_Text, (209, 250, 229))
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 9, 5)
 
     with dpg.theme(tag="bool_off_theme"):
         with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_color(dpg.mvThemeCol_Button, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (30, 35, 55))
-            dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_MUTED)
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 4)
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (39, 45, 56))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (55, 65, 81))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, BG_INPUT)
+            dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_SECONDARY)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 9, 5)
 
     # ── 输入框风格 ──
     with dpg.theme(tag="input_theme"):
-        with dpg.theme_component(dpg.mvInputText):
+        with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_FrameBg, BG_INPUT)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, BG_INPUT_ACTIVE)
             dpg.add_theme_color(dpg.mvThemeCol_Border, BORDER)
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 4)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
             dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 5)
 
     # ── 表格行交替色主题 ──
     with dpg.theme(tag="table_row_alt"):
@@ -1006,6 +1068,8 @@ def main():
                         else:
                             dpg.add_text("SMART200 PLC", color=ACCENT)
                         dpg.add_spacer(width=20)
+                        dpg.add_text("工业通讯监控台", color=TEXT_SECONDARY)
+                        dpg.add_spacer(width=18)
                         dpg.add_group(tag="bool_indicators_group", horizontal=True)
                     with dpg.group(horizontal=True):
                         dpg.add_text("●", tag="conn_indicator", color=TEXT_MUTED)
@@ -1026,6 +1090,7 @@ def main():
                     with dpg.child_window(tag="bar_card", height=200, border=True):
                         with dpg.group(horizontal=True):
                             dpg.add_text("数值柱状图", color=ACCENT)
+                            dpg.bind_item_theme(dpg.last_item(), "section_header")
                             dpg.add_spacer(width=12)
                             dpg.add_text("当前值", color=GREEN)
                             dpg.add_spacer(width=8)
@@ -1052,6 +1117,7 @@ def main():
                     with dpg.child_window(tag="wave_card", height=480, border=True):
                         with dpg.group(horizontal=True):
                             dpg.add_text("实时波形", color=ACCENT)
+                            dpg.bind_item_theme(dpg.last_item(), "section_header")
                             dpg.add_spacer(width=16)
                             dpg.add_text("窗口:", color=TEXT_SECONDARY)
                             dpg.add_input_int(tag="wave_time_window", default_value=60,
@@ -1084,6 +1150,7 @@ def main():
                     # 数据表格卡片
                     with dpg.child_window(tag="data_card", height=340, border=True):
                         dpg.add_text("监控数据", color=ACCENT)
+                        dpg.bind_item_theme(dpg.last_item(), "section_header")
                         dpg.add_separator()
                         dpg.add_spacer(height=2)
                         with dpg.table(
@@ -1106,6 +1173,7 @@ def main():
                     # 波形输出卡片
                     with dpg.child_window(tag="waveout_card", height=260, border=True):
                         dpg.add_text("波形输出", color=ACCENT)
+                        dpg.bind_item_theme(dpg.last_item(), "section_header")
                         dpg.add_separator()
                         dpg.add_spacer(height=6)
 
@@ -1160,6 +1228,7 @@ def main():
                     # 报警规则卡片
                     with dpg.child_window(tag="alarm_card", height=380, border=True):
                         dpg.add_text("报警规则", color=ACCENT)
+                        dpg.bind_item_theme(dpg.last_item(), "section_header")
                         dpg.add_separator()
                         dpg.add_spacer(height=8)
 
@@ -1185,6 +1254,7 @@ def main():
 
                         dpg.add_spacer(height=8)
                         dpg.add_button(label="+ 添加规则", callback=on_add_alarm, width=100)
+                        dpg.bind_item_theme(dpg.last_item(), "btn_primary_theme")
                         dpg.add_spacer(height=8)
                         with dpg.table(
                             tag="alarm_table", header_row=True, borders_innerH=True,
@@ -1204,6 +1274,7 @@ def main():
                     # PLC 连接卡片
                     with dpg.child_window(tag="conn_card", height=140, border=True):
                         dpg.add_text("PLC 连接", color=ACCENT)
+                        dpg.bind_item_theme(dpg.last_item(), "section_header")
                         dpg.add_separator()
                         dpg.add_spacer(height=8)
                         with dpg.group(horizontal=True):
@@ -1220,8 +1291,10 @@ def main():
                             dpg.add_input_int(tag="slot_input", default_value=0, width=75, min_value=0, max_value=31)
                             dpg.add_spacer(width=24)
                             dpg.add_button(label="连接 PLC", callback=on_connect, width=95)
+                            dpg.bind_item_theme(dpg.last_item(), "btn_primary_theme")
                             dpg.add_spacer(width=10)
                             dpg.add_button(label="断开连接", callback=on_disconnect, width=95)
+                            dpg.bind_item_theme(dpg.last_item(), "btn_ghost_theme")
                     dpg.bind_item_theme("conn_card", "card_theme")
 
                     dpg.add_spacer(height=8)
@@ -1229,6 +1302,7 @@ def main():
                     with dpg.child_window(tag="points_card", height=430, border=True):
                         with dpg.group(horizontal=True):
                             dpg.add_text("监控点管理", color=ACCENT)
+                            dpg.bind_item_theme(dpg.last_item(), "section_header")
                             dpg.add_spacer(width=20)
                             dpg.add_text("刷新间隔:", color=TEXT_SECONDARY)
                             dpg.add_input_int(tag="refresh_interval", default_value=500, width=80,
@@ -1236,8 +1310,10 @@ def main():
                             dpg.add_text("ms", color=TEXT_MUTED)
                             dpg.add_spacer(width=20)
                             dpg.add_button(label="导出", callback=on_export_points, width=50)
+                            dpg.bind_item_theme(dpg.last_item(), "btn_ghost_theme")
                             dpg.add_spacer(width=6)
                             dpg.add_button(label="导入", callback=on_import_points, width=50)
+                            dpg.bind_item_theme(dpg.last_item(), "btn_ghost_theme")
                         dpg.add_separator()
                         dpg.add_spacer(height=6)
 
@@ -1254,23 +1330,24 @@ def main():
                             dpg.add_spacer(width=4)
                             dpg.add_combo(tag="new_dtype_input",
                                           items=["Bool", "Byte", "Word", "DWord", "Real"],
-                                          default_value="Word", width=60)
+                                          default_value="Word", width=76)
                             dpg.add_spacer(width=8)
                             dpg.add_text("单位:")
                             dpg.add_spacer(width=4)
-                            dpg.add_input_text(tag="new_unit_input", width=50, hint="°C")
+                            dpg.add_input_text(tag="new_unit_input", width=74, hint="°C")
                             dpg.add_spacer(width=8)
                             dpg.add_text("比例:")
                             dpg.add_spacer(width=4)
-                            dpg.add_input_float(tag="new_scale_input", default_value=1.0, width=90,
+                            dpg.add_input_float(tag="new_scale_input", default_value=1.0, width=128,
                                                 step=0.1, format="%.4f")
-                            dpg.add_spacer(width=8)
+                            dpg.add_spacer(width=12)
                             dpg.add_text("小数:")
                             dpg.add_spacer(width=4)
-                            dpg.add_input_int(tag="new_dec_input", default_value=1, width=70,
+                            dpg.add_input_int(tag="new_dec_input", default_value=1, width=86,
                                               min_value=0, max_value=6)
                             dpg.add_spacer(width=8)
-                            dpg.add_button(label="+ 添加", callback=on_add_point, width=60)
+                            dpg.add_button(label="+ 添加", callback=on_add_point, width=76)
+                            dpg.bind_item_theme(dpg.last_item(), "btn_primary_theme")
                         dpg.bind_item_theme("points_card", "card_theme")
 
                         dpg.add_spacer(height=6)
@@ -1281,8 +1358,10 @@ def main():
                     with dpg.child_window(tag="alarm_history_card", height=240, border=True):
                         with dpg.group(horizontal=True):
                             dpg.add_text("报警历史", color=ACCENT)
+                            dpg.bind_item_theme(dpg.last_item(), "section_header")
                             dpg.add_spacer(width=420)
                             dpg.add_button(label="清除历史", callback=on_clear_alarm_history, width=80)
+                            dpg.bind_item_theme(dpg.last_item(), "btn_danger_theme")
                         dpg.bind_item_theme("alarm_history_card", "card_theme")
                         dpg.add_separator()
                         dpg.add_spacer(height=4)
