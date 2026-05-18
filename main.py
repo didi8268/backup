@@ -52,33 +52,39 @@ for addr, name, dt, unit, scale, dec in _monitor_test_points:
     monitor.add_point(addr, name, data_type=dt, unit=unit, scale=scale, decimal_places=dec)
 
 # ── 配色（Z-Monitor 风格青色科技主题）──────────────────
-BG_DARK = (14, 17, 23)       # neutral-950 主背景
-BG_SIDEBAR = (18, 24, 32)    # 顶栏/侧栏背景
-BG_CARD = (24, 30, 38)       # 卡片面板背景
-BG_CARD_ALT = (31, 38, 48)   # 卡片交替色
-BG_INPUT = (20, 25, 33)      # 输入框背景
-BG_INPUT_ACTIVE = (27, 36, 48)  # 输入/控件激活背景
-ACCENT = (6, 182, 212)       # cyan-500 主强调色
-ACCENT_HOVER = (34, 211, 238)  # cyan-400 悬停
-ACCENT_DIM = (8, 145, 178)   # cyan-600 暗强调
-ACCENT_SOFT = (10, 79, 96)    # 控件弱强调背景
-GREEN = (16, 185, 129)       # emerald-500 成功
-GREEN_GLOW = (52, 211, 153)  # green-400
-RED = (239, 68, 68)          # red-500 错误
-RED_GLOW = (252, 129, 129)   # red-300
-YELLOW = (245, 158, 11)      # amber-500 警告
-YELLOW_GLOW = (252, 211, 77)  # amber-300
-TEXT_PRIMARY = (226, 232, 240)   # slate-200
-TEXT_SECONDARY = (148, 163, 184)  # slate-400
-TEXT_MUTED = (100, 116, 139)     # slate-500
-BORDER = (51, 65, 85)           # 边框
-SUBTLE_BORDER = (38, 50, 64)    # 弱边框
-BORDER_ACCENT = (6, 182, 212, 60)  # 青色半透明边框
-SEPARATOR_COLOR = (71, 85, 105, 120)  # 分隔线
-PLOT_GRID = (71, 85, 105, 70)    # 图表网格线
-PLOT_BG = (17, 22, 30)           # 图表背景
+# 背景层级 (4级，由浅到深)
+BG_ELEVATED = (35, 42, 54)       # #232a36 悬浮层
+BG_CARD = (26, 33, 48)           # #1a2130 卡片面板
+BG_INPUT = (20, 27, 38)          # #141b26 输入框/表头
+BG_DARK = (15, 23, 42)           # #0f172a 主背景
+BG_SIDEBAR = (18, 26, 36)        # 顶栏背景
 
-# 波形颜色轮转 (支持无限通道)
+# 强调色 (Cyan 4 级梯度)
+ACCENT_HOVER = (34, 211, 238)    # #22d3ee 悬停高亮
+ACCENT = (6, 182, 212)           # #06b6d4 主强调
+ACCENT_DIM = (8, 145, 178)       # #0891b2 暗强调/主按钮
+ACCENT_SOFT = (14, 116, 144)     # #0e7490 弱强调
+
+# 语义色
+GREEN = (16, 185, 129)           # #10b981 成功
+RED = (239, 68, 68)              # #ef4444 危险
+YELLOW = (245, 158, 11)          # #f59e0b 警告
+
+# 文字色
+TEXT_PRIMARY = (226, 232, 240)   # #e2e8f0 正文
+TEXT_SECONDARY = (148, 163, 184) # #94a3b8 辅助
+TEXT_MUTED = (100, 116, 139)     # #64748b 弱化
+
+# 边框/分隔
+BORDER = (51, 65, 85)            # 边框
+SUBTLE_BORDER = (38, 50, 64)     # 弱边框
+SEPARATOR_COLOR = (71, 85, 105, 120)
+
+# 图表
+PLOT_GRID = (71, 85, 105, 70)
+PLOT_BG = (17, 22, 30)
+
+# 波形颜色轮转
 WAVE_PALETTE = [
     (6, 182, 212),     # cyan
     (52, 211, 153),    # green-400
@@ -882,24 +888,24 @@ def main():
             dpg.add_theme_color(dpg.mvThemeCol_WindowBg, BG_DARK)
             dpg.add_theme_color(dpg.mvThemeCol_ChildBg, BG_DARK)
             dpg.add_theme_color(dpg.mvThemeCol_FrameBg, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, BG_INPUT_ACTIVE)
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, ACCENT_SOFT)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_PRIMARY)
             dpg.add_theme_color(dpg.mvThemeCol_TextDisabled, TEXT_SECONDARY)
             dpg.add_theme_color(dpg.mvThemeCol_Button, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, ACCENT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_HOVER)
             dpg.add_theme_color(dpg.mvThemeCol_Header, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_HeaderActive, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_Separator, SEPARATOR_COLOR)
             dpg.add_theme_color(dpg.mvThemeCol_TableBorderStrong, BORDER)
             dpg.add_theme_color(dpg.mvThemeCol_TableBorderLight, SUBTLE_BORDER)
             dpg.add_theme_color(dpg.mvThemeCol_TableHeaderBg, BG_INPUT)
             dpg.add_theme_color(dpg.mvThemeCol_TableRowBg, (0, 0, 0, 0))
-            dpg.add_theme_color(dpg.mvThemeCol_TableRowBgAlt, BG_CARD_ALT)
+            dpg.add_theme_color(dpg.mvThemeCol_TableRowBgAlt, BG_ELEVATED)
             dpg.add_theme_color(dpg.mvThemeCol_ScrollbarBg, BG_DARK)
-            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrab, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrab, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrabHovered, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_ScrollbarGrabActive, ACCENT_DIM)
             dpg.add_theme_color(dpg.mvThemeCol_TitleBg, BG_SIDEBAR)
@@ -911,7 +917,7 @@ def main():
             dpg.add_theme_color(dpg.mvThemeCol_TabHovered, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_TabActive, ACCENT_DIM)
             dpg.add_theme_color(dpg.mvThemeCol_TabUnfocused, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_TabUnfocusedActive, BG_CARD_ALT)
+            dpg.add_theme_color(dpg.mvThemeCol_TabUnfocusedActive, BG_ELEVATED)
             dpg.add_theme_color(dpg.mvThemeCol_DockingPreview, ACCENT_DIM)
             dpg.add_theme_color(dpg.mvThemeCol_Border, BORDER)
             dpg.add_theme_color(dpg.mvThemeCol_PlotLines, ACCENT)
@@ -960,7 +966,7 @@ def main():
     with dpg.theme(tag="btn_ghost_theme"):
         with dpg.theme_component(dpg.mvButton):
             dpg.add_theme_color(dpg.mvThemeCol_Button, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_PRIMARY)
             dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
@@ -972,7 +978,7 @@ def main():
             dpg.add_theme_color(dpg.mvPlotCol_Fill, ACCENT_DIM)
     with dpg.theme(tag="bar_max_theme"):
         with dpg.theme_component(dpg.mvScatterSeries):
-            dpg.add_theme_color(dpg.mvPlotCol_Line, RED_GLOW)
+            dpg.add_theme_color(dpg.mvPlotCol_Line, RED)
             dpg.add_theme_style(dpg.mvPlotStyleVar_Marker, dpg.mvPlotMarker_Diamond)
             dpg.add_theme_style(dpg.mvPlotStyleVar_MarkerSize, 6)
 
@@ -1017,8 +1023,8 @@ def main():
     with dpg.theme(tag="input_theme"):
         with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_FrameBg, BG_INPUT)
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, BG_INPUT_ACTIVE)
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, BG_INPUT_ACTIVE)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, ACCENT_SOFT)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_Border, BORDER)
             dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
             dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1)
@@ -1027,7 +1033,7 @@ def main():
     # ── 表格行交替色主题 ──
     with dpg.theme(tag="table_row_alt"):
         with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, BG_CARD_ALT)
+            dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, BG_ELEVATED)
 
     # ── 青色分隔线主题 ──
     with dpg.theme(tag="accent_separator"):
@@ -1094,7 +1100,7 @@ def main():
                             dpg.add_spacer(width=12)
                             dpg.add_text("当前值", color=GREEN)
                             dpg.add_spacer(width=8)
-                            dpg.add_text("历史最大 ◆", color=RED_GLOW)
+                            dpg.add_text("历史最大 ◆", color=RED)
                         dpg.add_separator()
                         dpg.add_spacer(height=2)
                         with dpg.plot(
