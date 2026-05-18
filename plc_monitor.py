@@ -116,14 +116,10 @@ class PlcMonitor:
                     val = data[0] if data else None
                 elif point.data_type == "Word":
                     val = client.read_word(point.area_code, point.db_number, point.byte_offset)
-                elif point.data_type in ("DWord", "Real"):
+                elif point.data_type == "DWord":
                     val = client.read_dword(point.area_code, point.db_number, point.byte_offset)
-                    if point.data_type == "Real" and val is not None:
-                        # 解析为浮点数需要特殊处理
-                        data = client.read_bytes(point.area_code, point.db_number, point.byte_offset, 4)
-                        if data:
-                            import struct
-                            val = struct.unpack(">f", bytes(data[:4]))[0]
+                elif point.data_type == "Real":
+                    val = client.read_real(point.area_code, point.db_number, point.byte_offset)
                 else:
                     val = None
             except Exception:

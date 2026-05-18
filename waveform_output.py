@@ -29,10 +29,13 @@ class WaveformOutput:
         self._address_info: Optional[AddressInfo] = None
 
     def configure(self, address: str, wave_type: WaveformType,
-                  amplitude: float, offset: float, period_sec: float) -> bool:
+                  amplitude: float, offset: float, period_sec: float,
+                  data_type: str = "") -> bool:
         info = parse_address(address)
         if info is None or info.data_type == "Bool":
             return False
+        if data_type:
+            info.data_type = data_type
         self.target_address = address
         self._address_info = info
         self.waveform_type = wave_type
@@ -83,6 +86,8 @@ class WaveformOutput:
                 elif info.data_type == "DWord":
                     client.write_dword(info.area_code, info.db_number, info.byte_offset,
                                        max(-2147483648, min(2147483647, int(value))))
+                elif info.data_type == "Real":
+                    client.write_real(info.area_code, info.db_number, info.byte_offset, float(value))
             except Exception:
                 pass
 

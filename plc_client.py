@@ -157,31 +157,37 @@ class PlcClient:
         data = struct.pack(">f", value)
         return self.write_bytes(area, db_number, start, bytearray(data))
 
-    def read_by_address(self, address: str) -> Optional:
+    def read_by_address(self, address: str, data_type: str = "") -> Optional:
         info = parse_address(address)
         if info is None:
             return None
-        if info.data_type == "Bool":
+        dtype = data_type or info.data_type
+        if dtype == "Bool":
             return self.read_bool(info.area_code, info.db_number, info.byte_offset, info.bit_offset)
-        elif info.data_type == "Byte":
+        elif dtype == "Byte":
             data = self.read_bytes(info.area_code, info.db_number, info.byte_offset, 1)
             return data[0] if data else None
-        elif info.data_type == "Word":
+        elif dtype == "Word":
             return self.read_word(info.area_code, info.db_number, info.byte_offset)
-        elif info.data_type == "DWord":
+        elif dtype == "DWord":
             return self.read_dword(info.area_code, info.db_number, info.byte_offset)
+        elif dtype == "Real":
+            return self.read_real(info.area_code, info.db_number, info.byte_offset)
         return None
 
-    def write_by_address(self, address: str, value) -> bool:
+    def write_by_address(self, address: str, value, data_type: str = "") -> bool:
         info = parse_address(address)
         if info is None:
             return False
-        if info.data_type == "Bool":
+        dtype = data_type or info.data_type
+        if dtype == "Bool":
             return self.write_bool(info.area_code, info.db_number, info.byte_offset, info.bit_offset, bool(value))
-        elif info.data_type == "Byte":
+        elif dtype == "Byte":
             return self.write_bytes(info.area_code, info.db_number, info.byte_offset, bytearray([int(value) & 0xFF]))
-        elif info.data_type == "Word":
+        elif dtype == "Word":
             return self.write_word(info.area_code, info.db_number, info.byte_offset, int(value))
-        elif info.data_type == "DWord":
+        elif dtype == "DWord":
             return self.write_dword(info.area_code, info.db_number, info.byte_offset, int(value))
+        elif dtype == "Real":
+            return self.write_real(info.area_code, info.db_number, info.byte_offset, float(value))
         return False

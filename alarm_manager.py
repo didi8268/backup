@@ -42,6 +42,7 @@ class AlarmManager:
     def __init__(self):
         self.rules: list[AlarmRule] = []
         self._events: list[AlarmEvent] = []
+        self._active_rule_keys: set[tuple[int, CompareOp, float]] = set()
         self._on_alarm: Optional[Callable] = None
 
     def set_on_alarm(self, callback: Callable):
@@ -61,12 +62,31 @@ class AlarmManager:
 
     def remove_rule(self, index: int) -> bool:
         if 0 <= index < len(self.rules):
-            self.rules.pop(index)
+            rule = self.rules.pop(index)
+            self._active_rule_keys.discard(self._rule_key(rule))
             return True
         return False
 
+    def remap_after_point_delete(self, deleted_index: int):
+        new_rules = []
+        for rule in self.rules:
+            if rule.point_index == deleted_index:
+                continue
+            if rule.point_index > deleted_index:
+                rule.point_index -= 1
+            new_rules.append(rule)
+        self.rules = new_rules
+        self._active_rule_keys = {
+            self._rule_key(rule)
+            for rule in self.rules
+            if self._rule_key(rule) in self._active_rule_keys
+        }
+
     def get_events(self) -> list[AlarmEvent]:
         return list(self._events)
+
+    def _rule_key(self, rule: AlarmRule) -> tuple[int, CompareOp, float]:
+        return (rule.point_index, rule.op, rule.threshold)
 
     def check(self, monitor: PlcMonitor):
         points = monitor.get_points()
@@ -100,7 +120,11 @@ class AlarmManager:
             elif rule.op == CompareOp.EQ:
                 triggered = val_num == rule.threshold
 
+            rule_key = self._rule_key(rule)
             if triggered:
+                if rule_key in self._active_rule_keys:
+                    continue
+                self._active_rule_keys.add(rule_key)
                 event = AlarmEvent(rule=rule, value=val_num, timestamp=now)
                 self._events.append(event)
                 # 保持最近 1000 条报警
@@ -108,6 +132,8 @@ class AlarmManager:
                     self._events = self._events[-500:]
                 if self._on_alarm:
                     self._on_alarm(event)
+            else:
+                self._active_rule_keys.discard(rule_key)
 
     def clear_events(self):
         self._events.clear()
