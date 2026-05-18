@@ -950,7 +950,7 @@ def main():
         with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_ChildBg, BG_CARD)
             dpg.add_theme_color(dpg.mvThemeCol_Border, SUBTLE_BORDER)
-            dpg.add_theme_style(dpg.mvStyleVar_ChildRounding, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_ChildRounding, 8)
             dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1)
 
     # ── 按钮风格 ──
@@ -959,18 +959,38 @@ def main():
             dpg.add_theme_color(dpg.mvThemeCol_Button, ACCENT_DIM)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, ACCENT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_HOVER)
-            dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 255, 255))
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
-            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 11, 6)
+            dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 255, 255, 255))
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 4)
 
     with dpg.theme(tag="btn_ghost_theme"):
         with dpg.theme_component(dpg.mvButton):
             dpg.add_theme_color(dpg.mvThemeCol_Button, BG_INPUT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, ACCENT_SOFT)
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_SOFT)
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_DIM)
             dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_PRIMARY)
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
-            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 11, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 4)
+
+    with dpg.theme(tag="btn_outline_theme"):
+        with dpg.theme_component(dpg.mvButton):
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (0, 0, 0, 0))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, ACCENT_SOFT)
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, ACCENT_DIM)
+            dpg.add_theme_color(dpg.mvThemeCol_Text, ACCENT)
+            dpg.add_theme_color(dpg.mvThemeCol_Border, ACCENT_DIM)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 4)
+
+    with dpg.theme(tag="btn_danger_theme"):
+        with dpg.theme_component(dpg.mvButton):
+            dpg.add_theme_color(dpg.mvThemeCol_Button, (127, 29, 29))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (185, 28, 28))
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, RED)
+            dpg.add_theme_color(dpg.mvThemeCol_Text, (252, 165, 165, 255))
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 4)
 
     # ── 柱状图主题 ──
     with dpg.theme(tag="bar_theme"):
@@ -980,9 +1000,9 @@ def main():
         with dpg.theme_component(dpg.mvScatterSeries):
             dpg.add_theme_color(dpg.mvPlotCol_Line, RED)
             dpg.add_theme_style(dpg.mvPlotStyleVar_Marker, dpg.mvPlotMarker_Diamond)
-            dpg.add_theme_style(dpg.mvPlotStyleVar_MarkerSize, 6)
+            dpg.add_theme_style(dpg.mvPlotStyleVar_MarkerSize, 8)
 
-    # ── 波形复选框颜色主题（预创建，避免运行时重建冲突）──
+    # ── 波形复选框颜色主题 ──
     with dpg.theme(tag="wave_cb_muted"):
         with dpg.theme_component(dpg.mvCheckbox):
             dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_MUTED)
@@ -991,67 +1011,51 @@ def main():
             with dpg.theme_component(dpg.mvCheckbox):
                 dpg.add_theme_color(dpg.mvThemeCol_Text, cc)
 
-    with dpg.theme(tag="btn_danger_theme"):
-        with dpg.theme_component(dpg.mvButton):
-            dpg.add_theme_color(dpg.mvThemeCol_Button, (127, 29, 29))
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (185, 28, 28))
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, RED)
-            dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 255, 255))
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
-            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 11, 6)
-
-    # ── Bool 指示器主题 ──
+    # ── Bool LED 指示灯主题 ──
     with dpg.theme(tag="bool_on_theme"):
         with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_Button, (5, 95, 72))
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (5, 150, 105))
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, GREEN)
-            dpg.add_theme_color(dpg.mvThemeCol_Text, (209, 250, 229))
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
-            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 9, 5)
+            dpg.add_theme_color(dpg.mvThemeCol_Text, (209, 250, 229, 255))
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 12)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 3)
 
     with dpg.theme(tag="bool_off_theme"):
         with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_color(dpg.mvThemeCol_Button, (39, 45, 56))
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (55, 65, 81))
+            dpg.add_theme_color(dpg.mvThemeCol_Button, BG_INPUT)
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, ACCENT_SOFT)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, BG_INPUT)
             dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_SECONDARY)
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
-            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 9, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 12)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 3)
 
     # ── 输入框风格 ──
     with dpg.theme(tag="input_theme"):
         with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_FrameBg, BG_INPUT)
             dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, ACCENT_SOFT)
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, ACCENT_SOFT)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, BG_CARD)
             dpg.add_theme_color(dpg.mvThemeCol_Border, BORDER)
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 5)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 6)
             dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1)
             dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 5)
 
-    # ── 表格行交替色主题 ──
-    with dpg.theme(tag="table_row_alt"):
+    # ── 强调色分隔线主题 ──
+    with dpg.theme(tag="separator_accent"):
         with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_color(dpg.mvThemeCol_HeaderHovered, BG_ELEVATED)
+            dpg.add_theme_color(dpg.mvThemeCol_Separator, ACCENT)
+            dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 2)
 
-    # ── 青色分隔线主题 ──
-    with dpg.theme(tag="accent_separator"):
-        with dpg.theme_component(dpg.mvAll):
-            dpg.add_theme_color(dpg.mvThemeCol_Separator, ACCENT_DIM)
-            dpg.add_theme_style(dpg.mvStyleVar_FrameBorderSize, 1)
-
-    # ── 标题文字主题 ──
+    # ── 文字主题 ──
     with dpg.theme(tag="section_header"):
-        with dpg.theme_component(dpg.mvText):
+        with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_Text, ACCENT)
-
     with dpg.theme(tag="text_secondary"):
-        with dpg.theme_component(dpg.mvText):
+        with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_SECONDARY)
-
     with dpg.theme(tag="text_muted"):
-        with dpg.theme_component(dpg.mvText):
+        with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_color(dpg.mvThemeCol_Text, TEXT_MUTED)
 
     dpg.create_viewport(title="SMART200 PLC 通讯软件", width=1280, height=850,
