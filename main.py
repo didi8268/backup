@@ -145,7 +145,8 @@ def refresh_monitor_table():
                     val_str = str(pt.current_value)
             else:
                 val_str = "N/A"
-            dpg.add_text(val_str, color=GREEN if pt.current_value is not None else TEXT_SECONDARY)
+            ci = i % len(WAVE_PALETTE)
+            dpg.add_text(val_str, color=WAVE_PALETTE[ci] if pt.current_value is not None else TEXT_SECONDARY)
 
             with dpg.group(horizontal=True):
                 dpg.add_input_text(
@@ -1242,12 +1243,13 @@ def main():
 
                 # ═════════════ 控制设置 ═════════════
                 with dpg.tab(label="  控制设置  "):
-                    dpg.add_spacer(height=4)
+                    dpg.add_spacer(height=6)
                     # 波形输出卡片
                     with dpg.child_window(tag="waveout_card", height=260, border=True):
                         dpg.add_text("波形输出", color=ACCENT)
                         dpg.bind_item_theme(dpg.last_item(), "section_header")
                         dpg.add_separator()
+                        dpg.bind_item_theme(dpg.last_item(), "separator_accent")
                         dpg.add_spacer(height=6)
 
                         points = monitor.get_points()
@@ -1297,12 +1299,13 @@ def main():
                                      color=TEXT_MUTED)
                     dpg.bind_item_theme("waveout_card", "card_theme")
 
-                    dpg.add_spacer(height=4)
+                    dpg.add_spacer(height=6)
                     # 报警规则卡片
                     with dpg.child_window(tag="alarm_card", height=380, border=True):
                         dpg.add_text("报警规则", color=ACCENT)
                         dpg.bind_item_theme(dpg.last_item(), "section_header")
                         dpg.add_separator()
+                        dpg.bind_item_theme(dpg.last_item(), "separator_accent")
                         dpg.add_spacer(height=8)
 
                         alarm_items = [f"{p.name} ({p.address})" for p in monitor.get_points()] or ["(无监控点)"]
@@ -1343,12 +1346,13 @@ def main():
 
                 # ═════════════ 系统设置 ═════════════
                 with dpg.tab(label="  系统设置  "):
-                    dpg.add_spacer(height=4)
+                    dpg.add_spacer(height=6)
                     # PLC 连接卡片
                     with dpg.child_window(tag="conn_card", height=140, border=True):
                         dpg.add_text("PLC 连接", color=ACCENT)
                         dpg.bind_item_theme(dpg.last_item(), "section_header")
                         dpg.add_separator()
+                        dpg.bind_item_theme(dpg.last_item(), "separator_accent")
                         dpg.add_spacer(height=8)
                         with dpg.group(horizontal=True):
                             dpg.add_text("IP 地址:")
@@ -1370,7 +1374,7 @@ def main():
                             dpg.bind_item_theme(dpg.last_item(), "btn_ghost_theme")
                     dpg.bind_item_theme("conn_card", "card_theme")
 
-                    dpg.add_spacer(height=8)
+                    dpg.add_spacer(height=6)
                     # 监控点管理卡片
                     with dpg.child_window(tag="points_card", height=430, border=True):
                         with dpg.group(horizontal=True):
@@ -1388,6 +1392,7 @@ def main():
                             dpg.add_button(label="导入", callback=on_import_points, width=50)
                             dpg.bind_item_theme(dpg.last_item(), "btn_ghost_theme")
                         dpg.add_separator()
+                        dpg.bind_item_theme(dpg.last_item(), "separator_accent")
                         dpg.add_spacer(height=6)
 
                         with dpg.group(horizontal=True):
@@ -1426,7 +1431,7 @@ def main():
                         dpg.add_spacer(height=6)
                         dpg.add_group(tag="points_table_container")
 
-                    dpg.add_spacer(height=8)
+                    dpg.add_spacer(height=6)
                     # 报警历史卡片
                     with dpg.child_window(tag="alarm_history_card", height=240, border=True):
                         with dpg.group(horizontal=True):
@@ -1437,6 +1442,7 @@ def main():
                             dpg.bind_item_theme(dpg.last_item(), "btn_danger_theme")
                         dpg.bind_item_theme("alarm_history_card", "card_theme")
                         dpg.add_separator()
+                        dpg.bind_item_theme(dpg.last_item(), "separator_accent")
                         dpg.add_spacer(height=4)
 
                         with dpg.table(
@@ -1449,9 +1455,9 @@ def main():
                             dpg.add_table_column(label="描述")
 
         # ── 底部状态栏 ──
-        with dpg.child_window(tag="status_bar", height=32, border=False):
+        with dpg.child_window(tag="status_bar", height=30, border=False):
             with dpg.group(horizontal=True):
-                dpg.add_spacer(width=8)
+                dpg.add_spacer(width=12)
                 dpg.add_text("", tag="status_refresh", color=TEXT_SECONDARY)
                 dpg.add_text("|", color=TEXT_MUTED)
                 dpg.add_text("CSV: 停止", tag="status_csv", color=TEXT_SECONDARY)
