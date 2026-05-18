@@ -1150,7 +1150,7 @@ def main():
                     # 图表行：柱状图 + 波形图并排
                     with dpg.group(horizontal=True):
                         # 柱状图卡片 (左侧 ~35%)
-                        with dpg.child_window(tag="bar_card", width=380, height=300, border=True):
+                        with dpg.child_window(tag="bar_card", width=380, height=285, border=True):
                             with dpg.group(horizontal=True):
                                 dpg.add_text("数值柱状图", color=ACCENT)
                                 dpg.bind_item_theme(dpg.last_item(), "section_header")
@@ -1164,7 +1164,7 @@ def main():
                             dpg.bind_item_theme(dpg.last_item(), "separator_accent")
                             dpg.add_spacer(height=4)
                             with dpg.plot(
-                                tag="bar_plot", height=235, width=-1,
+                                tag="bar_plot", height=220, width=-1,
                                 anti_aliased=True, no_menus=True,
                             ):
                                 dpg.add_plot_axis(dpg.mvXAxis, label="", tag="bar_x_axis")
@@ -1181,7 +1181,7 @@ def main():
                         dpg.add_spacer(width=8)
 
                         # 波形图卡片 (右侧 ~65%)
-                        with dpg.child_window(tag="wave_card", height=300, border=True):
+                        with dpg.child_window(tag="wave_card", height=285, border=True):
                             with dpg.group(horizontal=True):
                                 dpg.add_text("实时波形", color=ACCENT)
                                 dpg.bind_item_theme(dpg.last_item(), "section_header")
@@ -1198,7 +1198,7 @@ def main():
                             dpg.add_group(tag="wave_channel_container", horizontal=True)
                             dpg.add_spacer(height=2)
                             with dpg.plot(
-                                tag="wave_plot", label="实时波形", height=200, width=-1,
+                                tag="wave_plot", label="实时波形", height=190, width=-1,
                                 anti_aliased=True, no_menus=True,
                             ):
                                 dpg.add_plot_legend()
@@ -1219,7 +1219,7 @@ def main():
                     dpg.add_spacer(height=6)
 
                     # 数据表格卡片 (全宽)
-                    with dpg.child_window(tag="data_card", height=340, border=True):
+                    with dpg.child_window(tag="data_card", height=310, border=True):
                         dpg.add_text("监控数据", color=ACCENT)
                         dpg.bind_item_theme(dpg.last_item(), "section_header")
                         if title_font:
