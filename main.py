@@ -674,38 +674,41 @@ def _on_bool_indicator_click(idx: int):
 
 
 def _refresh_bool_indicators():
-    """在标题栏重建 Bool 型监控点的开关指示器"""
+    """在标题栏重建 Bool 型监控点的 LED 指示器"""
     if not dpg.does_item_exist("bool_indicators_group"):
         return
 
-    # 清除旧指示器
     dpg.delete_item("bool_indicators_group", children_only=True)
 
     points = monitor.get_points()
     bool_points = [(i, pt) for i, pt in enumerate(points) if pt.data_type == "Bool"]
     for i, pt in bool_points:
         val = pt.current_value
-        label = f"● {pt.name} ON" if val else f"○ {pt.name} OFF"
-        dpg.add_button(
-            tag=f"bool_ind_{i}", label=label, width=95,
-            callback=lambda s, a, u: _on_bool_indicator_click(u),
-            user_data=i, parent="bool_indicators_group"
-        )
-        dpg.bind_item_theme(f"bool_ind_{i}", "bool_on_theme" if val else "bool_off_theme")
+        with dpg.group(horizontal=True, parent="bool_indicators_group"):
+            # LED 圆点 + 文字标签
+            dot_color = GREEN if val else TEXT_MUTED
+            dot = dpg.add_text("●", color=dot_color, tag=f"bool_dot_{i}")
+            label = dpg.add_text(f"{pt.name}", color=TEXT_PRIMARY if val else TEXT_SECONDARY, tag=f"bool_label_{i}")
+            # 保留可点击切换：添加小切换按钮
+            dpg.add_button(label="切换", width=40, height=18,
+                           callback=lambda s, a, u: _on_bool_indicator_click(u),
+                           user_data=i)
+            dpg.bind_item_theme(dpg.last_item(), "btn_outline_theme")
+            dpg.add_spacer(width=10)
 
 
 def _update_bool_indicators():
-    """更新 Bool 指示器的显示（周期刷新时调用，不重建 widget）"""
+    """更新 Bool 指示器显示（周期刷新，不重建 widget）"""
     points = monitor.get_points()
     for i, pt in enumerate(points):
         if pt.data_type != "Bool":
             continue
-        tag = f"bool_ind_{i}"
-        if not dpg.does_item_exist(tag):
-            continue
-        val = pt.current_value
-        dpg.configure_item(tag, label=f"● {pt.name} ON" if val else f"○ {pt.name} OFF")
-        dpg.bind_item_theme(tag, "bool_on_theme" if val else "bool_off_theme")
+        dot_tag = f"bool_dot_{i}"
+        label_tag = f"bool_label_{i}"
+        if dpg.does_item_exist(dot_tag) and dpg.does_item_exist(label_tag):
+            val = pt.current_value
+            dpg.configure_item(dot_tag, color=GREEN if val else TEXT_MUTED)
+            dpg.configure_item(label_tag, color=TEXT_PRIMARY if val else TEXT_SECONDARY)
 
 
 def _refresh_hero_metrics():
